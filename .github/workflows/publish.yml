@@ -1,0 +1,74 @@
+name: Publish to surge.sh
+
+on:
+  workflow_dispatch:
+    inputs:
+      surge_domain:
+        description: Target surge domain
+        required: false
+        default: ferryzhou.surge.sh
+  schedule:
+    # Daily, so changes to the source site propagate within a day.
+    - cron: "17 6 * * *"
+  push:
+    branches: [main]
+
+concurrency:
+  group: publish
+  cancel-in-progress: true
+
+env:
+  SOURCE_REPO: ferryzhou/ferryzhou.github.io
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source site
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPO }}
+          path: source
+
+      - name: Detect Jekyll
+        id: detect
+        run: |
+          if [ -f source/_config.yml ]; then
+            echo "jekyll=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "jekyll=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build with Jekyll (GitHub Pages compatible)
+        if: steps.detect.outputs.jekyll == 'true'
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: source
+          destination: site
+
+      - name: Use files as-is
+        if: steps.detect.outputs.jekyll == 'false'
+        run: |
+          mkdir site
+          rsync -a --exclude .git source/ site/
+
+      - name: Prepare for surge
+        run: |
+          # CNAME belongs to the GitHub Pages custom domain; surge would
+          # treat it as the deploy target, so remove it.
+          sudo rm -rf site/CNAME site/.git
+          test -f site/index.html || { echo "no index.html in built site" >&2; exit 1; }
+
+      - name: Deploy to surge
+        env:
+          SURGE_LOGIN: ${{ secrets.SURGE_LOGIN }}
+          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+          SURGE_DOMAIN: ${{ github.event.inputs.surge_domain || 'ferryzhou.surge.sh' }}
+        run: |
+          if [ -z "$SURGE_TOKEN" ]; then
+            echo "SURGE_TOKEN secret is not set; see README for setup" >&2
+            exit 1
+          fi
+          sudo chown -R "$(id -u):$(id -g)" site
+          npx --yes surge ./site "$SURGE_DOMAIN"
+          echo "Deployed to https://$SURGE_DOMAIN" >> "$GITHUB_STEP_SUMMARY"
