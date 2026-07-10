@@ -11,7 +11,7 @@
 # SURGE_TOKEN in the environment.
 set -euo pipefail
 
-SOURCE_REPO="${SOURCE_REPO:-ferryzhou/ferryzhou.github.io}"
+SOURCE_REPO="${SOURCE_REPO:-ferryzhou/web-apps}"
 SOURCE_BRANCH="${SOURCE_BRANCH:-}"
 SURGE_DOMAIN="${SURGE_DOMAIN:-ferryzhou.surge.sh}"
 

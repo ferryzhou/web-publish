@@ -2,13 +2,8 @@ name: Publish to surge.sh
 
 on:
   workflow_dispatch:
-    inputs:
-      surge_domain:
-        description: Target surge domain
-        required: false
-        default: ferryzhou.surge.sh
   schedule:
-    # Daily, so changes to the source site propagate within a day.
+    # Daily, so changes to the source sites propagate within a day.
     - cron: "17 6 * * *"
   push:
     branches: [main]
@@ -17,17 +12,24 @@ concurrency:
   group: publish
   cancel-in-progress: true
 
-env:
-  SOURCE_REPO: ferryzhou/ferryzhou.github.io
-
 jobs:
   publish:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # One entry per site to mirror. Add more repos here as needed, e.g.:
+        #   - repo: ferryzhou/ferryzhou.github.io
+        #     domain: ferryzhou-blog.surge.sh
+        include:
+          - repo: ferryzhou/web-apps
+            domain: ferryzhou.surge.sh
+    name: ${{ matrix.repo }} → ${{ matrix.domain }}
     steps:
       - name: Check out source site
         uses: actions/checkout@v4
         with:
-          repository: ${{ env.SOURCE_REPO }}
+          repository: ${{ matrix.repo }}
           path: source
 
       - name: Detect Jekyll
@@ -63,7 +65,7 @@ jobs:
         env:
           SURGE_LOGIN: ${{ secrets.SURGE_LOGIN }}
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
-          SURGE_DOMAIN: ${{ github.event.inputs.surge_domain || 'ferryzhou.surge.sh' }}
+          SURGE_DOMAIN: ${{ matrix.domain }}
         run: |
           if [ -z "$SURGE_TOKEN" ]; then
             echo "SURGE_TOKEN secret is not set; see README for setup" >&2
@@ -71,4 +73,4 @@ jobs:
           fi
           sudo chown -R "$(id -u):$(id -g)" site
           npx --yes surge ./site "$SURGE_DOMAIN"
-          echo "Deployed to https://$SURGE_DOMAIN" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deployed ${{ matrix.repo }} to https://$SURGE_DOMAIN" >> "$GITHUB_STEP_SUMMARY"
