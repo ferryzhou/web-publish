@@ -12,13 +12,17 @@ Everything is published under one surge domain:
 |--------------------------------------|-----------------------------------|
 | https://ferryzhou.surge.sh/          | landing page ([`root/index.html`](root/index.html)) |
 | https://ferryzhou.surge.sh/web-apps/ | `ferryzhou/web-apps`, deployed as-is |
+| https://ferryzhou.surge.sh/christian-film-reviews/ | `ferryzhou/christian-film-reviews`, deployed as-is |
 | https://ferryzhou.surge.sh/blog/     | `ferryzhou/ferryzhou.github.io`, built with Jekyll |
 
 ## How it works
 
 `scripts/publish.sh` composes a single site directory and deploys it:
 
-1. Clone `web-apps` into `web-apps/` (plain static files, no build).
+1. Clone each repo in `STATIC_REPOS` into a folder named after it
+   (plain static files, no build). Adding another static repo to the
+   mirror is a one-word change to the `STATIC_REPOS` default (plus a
+   link in `root/index.html`).
 2. Clone the blog, build it with Jekyll using `--baseurl /blog` so its links
    resolve under the subpath, into `blog/`. Hardcoded root-absolute asset
    paths in the built HTML (which bypass Jekyll's baseurl) are rewritten to
@@ -61,11 +65,11 @@ Requires git, node, and ruby with the blog's Jekyll dependencies
 
 Configuration is via environment variables (all optional):
 
-| Variable        | Default                          | Meaning                        |
-|-----------------|----------------------------------|--------------------------------|
-| `WEB_APPS_REPO` | `ferryzhou/web-apps`             | Repo published at `/web-apps/` |
-| `BLOG_REPO`     | `ferryzhou/ferryzhou.github.io`  | Repo published at `/blog/`     |
-| `SURGE_DOMAIN`  | `ferryzhou.surge.sh`             | Target surge domain            |
+| Variable       | Default                                            | Meaning                                    |
+|----------------|----------------------------------------------------|--------------------------------------------|
+| `STATIC_REPOS` | `ferryzhou/web-apps ferryzhou/christian-film-reviews` | Space-separated repos published at `/<name>/` |
+| `BLOG_REPO`    | `ferryzhou/ferryzhou.github.io`                    | Repo published at `/blog/`                 |
+| `SURGE_DOMAIN` | `ferryzhou.surge.sh`                               | Target surge domain                        |
 
 If you are already logged in to surge locally, `SURGE_LOGIN`/`SURGE_TOKEN` are not needed.
 
