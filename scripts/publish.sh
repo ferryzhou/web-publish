@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Publish GitHub Pages content to surge.sh under one domain:
 #
-#   https://SURGE_DOMAIN/           landing page (root/index.html in this repo)
-#   https://SURGE_DOMAIN/web-apps/  WEB_APPS_REPO, deployed as-is
-#   https://SURGE_DOMAIN/blog/      BLOG_REPO, built with Jekyll (baseurl /blog)
+#   https://SURGE_DOMAIN/          landing page (root/index.html in this repo)
+#   https://SURGE_DOMAIN/<name>/   each repo in STATIC_REPOS, deployed as-is
+#   https://SURGE_DOMAIN/blog/     BLOG_REPO, built with Jekyll (baseurl /blog)
 #
 # Requires: git, node/npx, and ruby with jekyll plus the blog's theme/plugins
 # (minima, jekyll-feed, jekyll-sitemap).
@@ -12,7 +12,7 @@
 # SURGE_TOKEN in the environment.
 set -euo pipefail
 
-WEB_APPS_REPO="${WEB_APPS_REPO:-ferryzhou/web-apps}"
+STATIC_REPOS="${STATIC_REPOS:-ferryzhou/web-apps ferryzhou/christian-film-reviews}"
 BLOG_REPO="${BLOG_REPO:-ferryzhou/ferryzhou.github.io}"
 SURGE_DOMAIN="${SURGE_DOMAIN:-ferryzhou.surge.sh}"
 
@@ -22,10 +22,13 @@ trap 'rm -rf "$workdir"' EXIT
 site="$workdir/site"
 mkdir -p "$site"
 
-echo "==> Cloning ${WEB_APPS_REPO} -> /web-apps/"
-git clone --depth 1 "https://github.com/${WEB_APPS_REPO}.git" "$workdir/web-apps"
-rm -rf "$workdir/web-apps/.git"
-cp -a "$workdir/web-apps" "$site/web-apps"
+for repo in $STATIC_REPOS; do
+  name="${repo##*/}"
+  echo "==> Cloning ${repo} -> /${name}/"
+  git clone --depth 1 "https://github.com/${repo}.git" "$workdir/$name"
+  rm -rf "$workdir/$name/.git"
+  cp -a "$workdir/$name" "$site/$name"
+done
 
 echo "==> Cloning ${BLOG_REPO} -> /blog/"
 git clone --depth 1 "https://github.com/${BLOG_REPO}.git" "$workdir/blog"
@@ -53,8 +56,8 @@ cp "$repo_root/root/index.html" "$site/index.html"
 # the root as the deploy target, and they are noise elsewhere.
 find "$site" -name CNAME -delete
 
-for f in index.html web-apps/index.html blog/index.html; do
-  [ -f "$site/$f" ] || { echo "error: missing $f in built site; refusing to deploy" >&2; exit 1; }
+for d in "" $(for repo in $STATIC_REPOS; do echo "${repo##*/}/"; done) blog/; do
+  [ -f "$site/${d}index.html" ] || { echo "error: missing ${d}index.html in built site; refusing to deploy" >&2; exit 1; }
 done
 
 echo "==> Deploying to https://${SURGE_DOMAIN}"
@@ -62,5 +65,5 @@ npx --yes surge "$site" "$SURGE_DOMAIN"
 
 echo "==> Done:"
 echo "    https://${SURGE_DOMAIN}/"
-echo "    https://${SURGE_DOMAIN}/web-apps/"
+for repo in $STATIC_REPOS; do echo "    https://${SURGE_DOMAIN}/${repo##*/}/"; done
 echo "    https://${SURGE_DOMAIN}/blog/"
