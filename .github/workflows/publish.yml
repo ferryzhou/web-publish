@@ -1,0 +1,40 @@
+name: Publish to surge.sh
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily, so changes to the source sites propagate within a day.
+    - cron: "17 6 * * *"
+  push:
+    branches: [main]
+
+concurrency:
+  group: publish
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out web-publish
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+
+      - name: Install Jekyll and blog dependencies
+        run: gem install --no-document jekyll minima jekyll-feed jekyll-sitemap
+
+      - name: Build and deploy
+        env:
+          SURGE_LOGIN: ${{ secrets.SURGE_LOGIN }}
+          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+        run: |
+          if [ -z "$SURGE_TOKEN" ]; then
+            echo "SURGE_TOKEN secret is not set; see README for setup" >&2
+            exit 1
+          fi
+          ./scripts/publish.sh
+          echo "Deployed to https://ferryzhou.surge.sh (/, /web-apps/, /blog/)" >> "$GITHUB_STEP_SUMMARY"
