@@ -15,62 +15,26 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # One entry per site to mirror. Add more repos here as needed, e.g.:
-        #   - repo: ferryzhou/ferryzhou.github.io
-        #     domain: ferryzhou-blog.surge.sh
-        include:
-          - repo: ferryzhou/web-apps
-            domain: ferryzhou.surge.sh
-    name: ${{ matrix.repo }} → ${{ matrix.domain }}
     steps:
-      - name: Check out source site
+      - name: Check out web-publish
         uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
         with:
-          repository: ${{ matrix.repo }}
-          path: source
+          ruby-version: "3.3"
 
-      - name: Detect Jekyll
-        id: detect
-        run: |
-          if [ -f source/_config.yml ]; then
-            echo "jekyll=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "jekyll=false" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Install Jekyll and blog dependencies
+        run: gem install --no-document jekyll minima jekyll-feed jekyll-sitemap
 
-      - name: Build with Jekyll (GitHub Pages compatible)
-        if: steps.detect.outputs.jekyll == 'true'
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: source
-          destination: site
-
-      - name: Use files as-is
-        if: steps.detect.outputs.jekyll == 'false'
-        run: |
-          mkdir site
-          rsync -a --exclude .git source/ site/
-
-      - name: Prepare for surge
-        run: |
-          # CNAME belongs to the GitHub Pages custom domain; surge would
-          # treat it as the deploy target, so remove it.
-          sudo rm -rf site/CNAME site/.git
-          test -f site/index.html || { echo "no index.html in built site" >&2; exit 1; }
-
-      - name: Deploy to surge
+      - name: Build and deploy
         env:
           SURGE_LOGIN: ${{ secrets.SURGE_LOGIN }}
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
-          SURGE_DOMAIN: ${{ matrix.domain }}
         run: |
           if [ -z "$SURGE_TOKEN" ]; then
             echo "SURGE_TOKEN secret is not set; see README for setup" >&2
             exit 1
           fi
-          sudo chown -R "$(id -u):$(id -g)" site
-          npx --yes surge ./site "$SURGE_DOMAIN"
-          echo "Deployed ${{ matrix.repo }} to https://$SURGE_DOMAIN" >> "$GITHUB_STEP_SUMMARY"
+          ./scripts/publish.sh
+          echo "Deployed to https://ferryzhou.surge.sh (/, /web-apps/, /blog/)" >> "$GITHUB_STEP_SUMMARY"

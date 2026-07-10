@@ -4,33 +4,32 @@ Publish my GitHub Pages content to somewhere else, like [surge.sh](https://surge
 
 GitHub Pages is the primary host. This repo mirrors the same content to a secondary host so the sites stay reachable if github.io is slow, blocked, or down.
 
-## Sites
+## Layout
 
-The list of mirrored sites lives in the `matrix.include` block of
-[`.github/workflows/publish.yml`](.github/workflows/publish.yml):
+Everything is published under one surge domain:
 
-| Source repo           | Published at                    |
-|-----------------------|---------------------------------|
-| `ferryzhou/web-apps`  | https://ferryzhou.surge.sh      |
-
-To mirror another repo, add an entry to the matrix with its own `domain`
-(any `*.surge.sh` name works), e.g.:
-
-```yaml
-- repo: ferryzhou/ferryzhou.github.io
-  domain: ferryzhou-blog.surge.sh
-```
+| URL                                  | Source                            |
+|--------------------------------------|-----------------------------------|
+| https://ferryzhou.surge.sh/          | landing page ([`root/index.html`](root/index.html)) |
+| https://ferryzhou.surge.sh/web-apps/ | `ferryzhou/web-apps`, deployed as-is |
+| https://ferryzhou.surge.sh/blog/     | `ferryzhou/ferryzhou.github.io`, built with Jekyll |
 
 ## How it works
 
-For each site in the matrix:
+`scripts/publish.sh` composes a single site directory and deploys it:
 
-1. The source repo is cloned.
-2. If it is a Jekyll site (`_config.yml` present), it is built the same way GitHub Pages builds it. Otherwise the files are deployed as-is.
-3. A `CNAME` file, if any, is stripped (it would override the surge domain).
-4. The result is pushed to surge with the [surge CLI](https://surge.sh/help/).
+1. Clone `web-apps` into `web-apps/` (plain static files, no build).
+2. Clone the blog, build it with Jekyll using `--baseurl /blog` so its links
+   resolve under the subpath, into `blog/`. Hardcoded root-absolute asset
+   paths in the built HTML (which bypass Jekyll's baseurl) are rewritten to
+   `/blog/...`.
+3. Copy the landing page to the site root and strip any `CNAME` files
+   (surge would treat one as the deploy target).
+4. Push the whole directory to surge with the [surge CLI](https://surge.sh/help/).
 
-The workflow runs on a daily schedule, on demand (`workflow_dispatch`), and on pushes to `main`.
+The GitHub Actions workflow (`.github/workflows/publish.yml`) runs the same
+script on a daily schedule, on demand (`workflow_dispatch`), and on pushes
+to `main`.
 
 ## Setup (GitHub Actions)
 
@@ -57,13 +56,16 @@ The workflow runs on a daily schedule, on demand (`workflow_dispatch`), and on p
 SURGE_LOGIN=you@example.com SURGE_TOKEN=xxxx ./scripts/publish.sh
 ```
 
+Requires git, node, and ruby with the blog's Jekyll dependencies
+(`gem install jekyll minima jekyll-feed jekyll-sitemap`).
+
 Configuration is via environment variables (all optional):
 
-| Variable        | Default                | Meaning                         |
-|-----------------|------------------------|---------------------------------|
-| `SOURCE_REPO`   | `ferryzhou/web-apps`   | GitHub repo that holds the site |
-| `SOURCE_BRANCH` | repo default branch    | Branch to publish from          |
-| `SURGE_DOMAIN`  | `ferryzhou.surge.sh`   | Target surge domain             |
+| Variable        | Default                          | Meaning                        |
+|-----------------|----------------------------------|--------------------------------|
+| `WEB_APPS_REPO` | `ferryzhou/web-apps`             | Repo published at `/web-apps/` |
+| `BLOG_REPO`     | `ferryzhou/ferryzhou.github.io`  | Repo published at `/blog/`     |
+| `SURGE_DOMAIN`  | `ferryzhou.surge.sh`             | Target surge domain            |
 
 If you are already logged in to surge locally, `SURGE_LOGIN`/`SURGE_TOKEN` are not needed.
 
